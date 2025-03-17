@@ -170,6 +170,8 @@ class TypeThis extends StatefulWidget {
   /// And text style will be added to the matched strings.
   final List<TypeThisMatcher> richTextMatchers;
 
+  final VoidCallback? onAnimationEnd;
+
   /// {@macro typethis}
   const TypeThis({
     super.key,
@@ -198,6 +200,7 @@ class TypeThis extends StatefulWidget {
     this.textHeightBehavior,
     this.selectionColor,
     this.richTextMatchers = const <TypeThisMatcher>[],
+    this.onAnimationEnd,
   })  : assert(
           speed >= 0,
           'spped must either be 0 or greater than 0',
@@ -279,6 +282,7 @@ class _TypeThisState extends State<TypeThis> {
       currentStep++;
       if (currentStep == widget.string.characters.length) {
         timer.cancel();
+        widget.onAnimationEnd?.call();
       }
       if (mounted) {
         setState(() {});
