@@ -172,6 +172,8 @@ class TypeThis extends StatefulWidget {
 
   final VoidCallback? onAnimationEnd;
 
+  final bool animate;
+
   /// {@macro typethis}
   const TypeThis({
     super.key,
@@ -201,6 +203,7 @@ class TypeThis extends StatefulWidget {
     this.selectionColor,
     this.richTextMatchers = const <TypeThisMatcher>[],
     this.onAnimationEnd,
+    this.animate = true,
   })  : assert(
           speed >= 0,
           'spped must either be 0 or greater than 0',
@@ -217,41 +220,17 @@ class TypeThis extends StatefulWidget {
 class _TypeThisState extends State<TypeThis> {
   List<Map<String, TextStyle?>> richTextMappers = [];
   int currentStep = 0;
+  String text = '';
 
   late Timer timer;
 
   @override
   void initState() {
     super.initState();
-    final matchers = widget.richTextMatchers;
-
-    final patternsList = matchers.map((matcher) => matcher.regexPattern);
-    final pattern = patternsList.isNotEmpty ? patternsList.join('|') : '(?!.*)';
-
-    widget.string.splitMapJoin(
-      RegExp(pattern),
-      onMatch: (Match match) {
-        final matchData = match[0];
-        final matcherToConsider = matchers.firstWhere(
-          (matcher) => RegExp(matcher.regexPattern).hasMatch(matchData ?? ''),
-        );
-
-        if (matchData != null) {
-          richTextMappers.add(<String, TextStyle?>{
-            matchData: matcherToConsider.style ?? widget.style,
-          });
-        }
-
-        return '';
-      },
-      onNonMatch: (String nonMatch) {
-        richTextMappers.add(<String, TextStyle?>{
-          nonMatch: widget.style,
-        });
-        return '';
-      },
-    );
-
+    _prepareText();
+    if (!widget.animate) {
+      currentStep = text.characters.length;
+    }
     _startTimerAndUpdateState();
     widget.controller?.addListener(_handleControllerChange);
   }
@@ -260,6 +239,53 @@ class _TypeThisState extends State<TypeThis> {
   void dispose() {
     timer.cancel();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant TypeThis oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animate != oldWidget.animate) {
+      currentStep = widget.animate ? 0 : text.characters.length;
+    }
+    if (widget.richTextMatchers != oldWidget.richTextMatchers) {
+      _prepareText();
+    }
+  }
+
+  void _prepareText() {
+    richTextMappers.clear();
+    final matchers = widget.richTextMatchers;
+
+    final patternsList = matchers.map((matcher) => matcher.regexPattern);
+    final pattern = patternsList.isNotEmpty ? patternsList.join('|') : '(?!.*)';
+
+    text = widget.string.splitMapJoin(
+      RegExp(pattern),
+      onMatch: (Match match) {
+        final matchData = match[0];
+        final matcherToConsider = matchers.firstWhere(
+          (matcher) => RegExp(matcher.regexPattern).hasMatch(matchData ?? ''),
+        );
+
+        final displayText =
+            match[match.groupCount > 0 ? match.groupCount - 1 : 0] ??
+                matchData ??
+                '';
+        if (matchData != null) {
+          richTextMappers.add(<String, TextStyle?>{
+            displayText: matcherToConsider.style ?? widget.style,
+          });
+        }
+
+        return displayText;
+      },
+      onNonMatch: (String nonMatch) {
+        richTextMappers.add(<String, TextStyle?>{
+          nonMatch: widget.style,
+        });
+        return nonMatch;
+      },
+    );
   }
 
   void _handleControllerChange() {
@@ -280,7 +306,7 @@ class _TypeThisState extends State<TypeThis> {
   void _startTimerAndUpdateState() {
     timer = Timer.periodic(Duration(milliseconds: widget.speed), (_) {
       currentStep++;
-      if (currentStep == widget.string.characters.length) {
+      if (currentStep >= text.characters.length) {
         timer.cancel();
         widget.onAnimationEnd?.call();
       }
@@ -335,11 +361,7 @@ class _TypeThisState extends State<TypeThis> {
         children: [
           ...widgets,
           widget.showBlinkingCursor
-              ? WidgetSpan(
-                  child: BlinkingCursor(
-                    cursorText: widget.cursorText,
-                  ),
-                )
+              ? WidgetSpan(child: BlinkingCursor(cursorText: widget.cursorText))
               : const TextSpan(),
         ],
       ),
